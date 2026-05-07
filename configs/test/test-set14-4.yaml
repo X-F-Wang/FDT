@@ -1,0 +1,21 @@
+test_dataset:
+  dataset:
+    name: paired-image-folders
+    #name: image-folder
+    args:
+      #root_path: /home/data/Set14/HR
+      root_path_1: /home/data/Set14/image_SRF_4/LR
+      root_path_2: /home/data/Set14/image_SRF_4/HR
+  wrapper:
+    name: sr-implicit-paired-cascaded
+    args:
+      batch_size: 1
+      scale_base: 4
+  batch_size: 1
+
+eval_type: benchmark-4
+eval_bsize: 30000
+
+data_norm:
+  inp: {sub: [0.5], div: [0.5]}
+  gt: {sub: [0.5], div: [0.5]}
