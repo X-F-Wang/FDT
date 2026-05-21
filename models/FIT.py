@@ -17,7 +17,7 @@ from utils import make_coord
 
 class FEM(nn.Module):
     r"""Mixing pixels with their surrounding pixels.
-
+    ”“”64*3
     In the paper, it is referred to as FEM
 
     """
@@ -361,14 +361,12 @@ class PCSA(nn.Module):
         self.window_size = window_size
         self.num_heads = num_heads
 
-        # 设置各层保留的token数 (渐进减少)
         if num_topk_list is None:
             base_topk = window_size * window_size
             self.num_topk_list = [max(base_topk // (2 ** i), 4) for i in range(depth)]
         else:
             self.num_topk_list = num_topk_list
 
-        # 创建多层注意力
         self.layers = nn.ModuleList()
         for i in range(depth):
             self.layers.append(
@@ -381,57 +379,41 @@ class PCSA(nn.Module):
                 )
             )
 
-        # 输入归一化
         self.norm = nn.LayerNorm(dim)
 
-        # 输出投影
         self.output_proj = nn.Conv2d(dim, dim, 3, 1, 1)
 
     def forward(self, x):
-        # 输入形状: [B, C, H, W]
         B, C, H_orig, W_orig = x.shape
 
-        # --- 自动填充以适应窗口大小 ---
         pad_h = (self.window_size - H_orig % self.window_size) % self.window_size
         pad_w = (self.window_size - W_orig % self.window_size) % self.window_size
         if pad_h > 0 or pad_w > 0:
             x = F.pad(x, (0, pad_w, 0, pad_h), mode='reflect')
         H, W = x.shape[2:]
-        # --- 填充结束 ---
 
-        # 转换为序列形式 [B, H, W, C]
         x = x.permute(0, 2, 3, 1).contiguous()
 
-        # 窗口划分
         x_windows = window_partition(x, self.window_size)
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)
 
-        # 归一化
         x_windows = self.norm(x_windows)
 
-        # 初始化PFA状态
         pfa_values = None
         pfa_indices = None
 
-        # 逐层处理
         for layer in self.layers:
             x_windows, pfa_values, pfa_indices = layer(
                 x_windows, pfa_values, pfa_indices
             )
 
-        # 窗口还原
         x_windows = x_windows.view(-1, self.window_size, self.window_size, C)
         x = window_reverse(x_windows, self.window_size, H, W)
 
-        # 转换回 [B, C, H, W]
         x = x.permute(0, 3, 1, 2).contiguous()
 
-        # --- 裁剪回原始尺寸 ---
         if pad_h > 0 or pad_w > 0:
             x = x[:, :, :H_orig, :W_orig]
-        # --- 裁剪结束 ---
-
-        # 输出投影
         x = self.output_proj(x)
 
         return x
@@ -455,9 +437,9 @@ class APFN(nn.Module):
             depth=3,
             window_size=8,
             num_heads=4,
-            num_topk_list=[64, 64, 64]
+            num_topk_list=[]
         )
-        self.post = FEM(planes=64)
+        self.post = FEM(planes=)
 
     def forward(self, x):
         B, C, H, W = x.shape
